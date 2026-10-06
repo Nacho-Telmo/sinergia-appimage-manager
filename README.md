@@ -1,5 +1,7 @@
 # Sinergia AppImage Manager
 
+![Vista previa de Sinergia AppImage Manager](assets/sinergia-appimage-manager.png)
+
 Un gestor moderno y oscuro de AppImages para Linux con integración nativa.
 
 ## Características
