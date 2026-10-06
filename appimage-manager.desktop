@@ -4,6 +4,6 @@ Type=Application
 Name=Sinergia AppImage Manager
 Comment=Gestor moderno de archivos AppImage para Linux
 Exec=appimage-manager
-Icon=application-x-executable
+Icon=sinergia
 Terminal=false
 Categories=Utility;PackageManager;

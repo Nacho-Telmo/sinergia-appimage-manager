@@ -1,7 +1,7 @@
 # Maintainer: Sinergia Comunidad Linuxera sinergia.comunidad.linuxuera@gmail.com
 pkgname=sinergia-appimage-manager
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Un gestor moderno y oscuro de AppImages para Linux con integración en KDE/Wayland"
 arch=('any')
 url="https://github.com/Nacho-Telmo/sinergia-appimage-manager"
@@ -19,6 +19,8 @@ package() {
 
     # Instalar el archivo .desktop para el menú de aplicaciones de Plasma
     install -Dm644 appimage-manager.desktop "$pkgdir/usr/share/applications/sinergia.desktop"
+
+    install -Dm644 sinergia.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/sinergia.svg"
 
     # Instalar la licencia requerida por paquetes GPL en Arch
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
