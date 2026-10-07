@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
@@ -30,6 +30,55 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S",
 )
+
+
+class AppImageProcessorWorker(QThread):
+  finished = pyqtSignal(str)
+
+  def __init__(self, file_path, manager):
+    super().__init__()
+    self.file_path = file_path
+    self.manager = manager
+
+  def run(self):
+    try:
+      source_path = Path(self.file_path).resolve()
+      target_dir = self.manager.managed_appimages_dir.resolve()
+
+      # Mover a carpeta segura si no está ahí
+      if not source_path.is_relative_to(target_dir):
+        target_path = target_dir / source_path.name
+        if not target_path.exists():
+          shutil.move(str(source_path), str(target_path))
+          logging.debug(f"AppImage movida a carpeta segura -> {target_path}")
+        else:
+          logging.debug(
+              f"El archivo ya existe en la carpeta segura, usando existente:"
+              f" {target_path}"
+          )
+          # Si ya existe, podemos eliminar el temporal/origen o dejarlo, aquí apuntamos al seguro
+          try:
+            source_path.unlink()
+          except Exception:
+            pass
+        final_path = str(target_path)
+      else:
+        logging.debug(
+            f"El AppImage ya se encontraba en la carpeta segura -> {source_path}"
+        )
+        final_path = str(source_path)
+
+      # Permisos de ejecución
+      os.chmod(final_path, 0o755)
+
+      # Extracción de assets e integración de escritorio en segundo plano
+      icon_path = self.manager.extract_assets_and_integrate(final_path)
+
+      # Empaquetamos la ruta y el icono resultante para pasarlo al hilo principal
+      self.finished.emit(json.dumps({"path": final_path, "icon": icon_path}))
+    except Exception as e:
+      logging.error(f"Error procesando AppImage en segundo plano: {e}")
+      self.finished.emit("")
 
 
 class DropZoneWidget(QFrame):
@@ -251,6 +300,7 @@ class AppImageManager(QMainWindow):
   def extract_assets_and_integrate(self, app_path):
     icon_dest_path = None
     try:
+      logging.debug(f"Iniciando extracción de assets para: {app_path}")
       with tempfile.TemporaryDirectory() as tmpdir:
         result = subprocess.run(
             [app_path, "--appimage-extract"],
@@ -259,6 +309,10 @@ class AppImageManager(QMainWindow):
             stderr=subprocess.DEVNULL,
         )
         if result.returncode != 0:
+          logging.warning(
+              "No se pudo extraer el AppImage (código de salida no"
+              f" cero: {result.returncode})"
+          )
           return None
 
         squashfs_root = Path(tmpdir) / "squashfs-root"
@@ -327,21 +381,19 @@ class AppImageManager(QMainWindow):
               stdout=subprocess.DEVNULL,
               stderr=subprocess.DEVNULL,
           )
+          logging.debug(f"Integración de escritorio completada para {app_path}")
 
     except Exception as e:
       logging.error(f"Error en la extracción/integración: {e}")
 
     return str(icon_dest_path) if icon_dest_path else None
 
-  def add_appimage_to_ui(self, file_path, save=True):
+  def add_appimage_to_ui(self, file_path, icon_path=None, save=True):
     path = Path(file_path)
     if str(path) in self.appimages:
       return
 
     try:
-      os.chmod(path, 0o755)
-      icon_path = self.extract_assets_and_integrate(str(path))
-
       item = QListWidgetItem(path.name)
       if icon_path and os.path.exists(icon_path):
         item.setIcon(QIcon(icon_path))
@@ -351,29 +403,27 @@ class AppImageManager(QMainWindow):
 
       if save:
         self.save_apps()
+      logging.debug(f"AppImage añadida exitosamente a la UI -> {path.name}")
     except Exception as e:
-      logging.error(f"Error al procesar el AppImage: {e}")
+      logging.error(f"Error al añadir el AppImage a la UI: {e}")
 
   def process_and_add_appimage(self, file_path):
-    source_path = Path(file_path).resolve()
-    target_dir = self.managed_appimages_dir.resolve()
+    # Lanzamos el worker en segundo plano para no congelar la GUI con ficheros pesados (como Audacity)
+    self.worker = AppImageProcessorWorker(file_path, self)
+    self.worker.finished.connect(self.on_process_finished)
+    self.worker.start()
 
+  def on_process_finished(self, result_json):
+    if not result_json:
+      return
     try:
-      if not source_path.is_relative_to(target_dir):
-        target_path = target_dir / source_path.name
-        shutil.move(str(source_path), str(target_path))
-        file_path = str(target_path)
-        logging.debug(f"AppImage movida a carpeta segura -> {file_path}")
-      else:
-        logging.debug(
-            f"El AppImage ya se encontraba en la carpeta segura ->"
-            f" {source_path}"
-        )
+      data = json.loads(result_json)
+      final_path = data.get("path")
+      icon_path = data.get("icon")
+      if final_path:
+        self.add_appimage_to_ui(final_path, icon_path=icon_path, save=True)
     except Exception as e:
-      logging.error(f"Error al mover el AppImage a la carpeta segura: {e}")
-      file_path = str(source_path)
-
-    self.add_appimage_to_ui(file_path, save=True)
+      logging.error(f"Error al procesar el resultado del hilo: {e}")
 
   def add_appimage_dialog(self):
     file_path, _ = QFileDialog.getOpenFileName(
