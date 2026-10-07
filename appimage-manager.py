@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -21,6 +22,13 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+)
+
+# Configuración del sistema de logging para depuración profesional
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
 )
 
 
@@ -102,7 +110,7 @@ class DropZoneWidget(QFrame):
     self.dragLeaveEvent(event)
     for url in event.mimeData().urls():
       file_path = url.toLocalFile()
-      print(f"DEBUG: Archivo soltado en DropZone -> {file_path}")
+      logging.debug(f"Archivo soltado en DropZone -> {file_path}")
       if file_path.lower().endswith(".appimage"):
         self.main_window.process_and_add_appimage(file_path)
     event.acceptProposedAction()
@@ -125,6 +133,11 @@ class AppImageManager(QMainWindow):
 
     self.desktop_apps_dir = Path.home() / ".local" / "share" / "applications"
     self.desktop_apps_dir.mkdir(parents=True, exist_ok=True)
+
+    self.managed_appimages_dir = (
+        Path.home() / ".local" / "share" / "sinergia" / "appimages"
+    )
+    self.managed_appimages_dir.mkdir(parents=True, exist_ok=True)
 
     self.setStyleSheet("""
             QMainWindow {
@@ -188,16 +201,13 @@ class AppImageManager(QMainWindow):
     layout.setContentsMargins(20, 20, 20, 20)
     layout.setSpacing(15)
 
-    # Zona permanente de arrastre y selección arriba
     self.drop_zone = DropZoneWidget(self)
     layout.addWidget(self.drop_zone)
 
-    # Lista de aplicaciones guardadas
     self.list_widget = QListWidget()
     self.list_widget.setIconSize(QSize(36, 36))
     layout.addWidget(self.list_widget)
 
-    # Botones inferiores
     btn_layout = QHBoxLayout()
     self.btn_add = QPushButton("Añadir con Botón")
     self.btn_remove = QPushButton("Quitar de la lista")
@@ -229,14 +239,14 @@ class AppImageManager(QMainWindow):
             if os.path.exists(path_str):
               self.add_appimage_to_ui(path_str, save=False)
       except Exception as e:
-        print(f"Error al cargar las apps guardadas: {e}")
+        logging.error(f"Error al cargar las apps guardadas: {e}")
 
   def save_apps(self):
     try:
       with open(self.config_file, "w", encoding="utf-8") as f:
         json.dump(self.appimages, f, indent=4)
     except Exception as e:
-      print(f"Error al guardar las apps: {e}")
+      logging.error(f"Error al guardar las apps: {e}")
 
   def extract_assets_and_integrate(self, app_path):
     icon_dest_path = None
@@ -319,7 +329,7 @@ class AppImageManager(QMainWindow):
           )
 
     except Exception as e:
-      print(f"Error en la extracción/integración: {e}")
+      logging.error(f"Error en la extracción/integración: {e}")
 
     return str(icon_dest_path) if icon_dest_path else None
 
@@ -342,9 +352,21 @@ class AppImageManager(QMainWindow):
       if save:
         self.save_apps()
     except Exception as e:
-      print(f"Error al procesar el AppImage: {e}")
+      logging.error(f"Error al procesar el AppImage: {e}")
 
   def process_and_add_appimage(self, file_path):
+    source_path = Path(file_path)
+
+    if not source_path.is_relative_to(self.managed_appimages_dir):
+      target_path = self.managed_appimages_dir / source_path.name
+      try:
+        shutil.move(str(source_path), str(target_path))
+        file_path = str(target_path)
+        logging.debug(f"AppImage movida a carpeta segura -> {file_path}")
+      except Exception as e:
+        logging.error(f"Error al mover el AppImage a la carpeta segura: {e}")
+        file_path = str(source_path)
+
     self.add_appimage_to_ui(file_path, save=True)
 
   def add_appimage_dialog(self):
