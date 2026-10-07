@@ -355,17 +355,23 @@ class AppImageManager(QMainWindow):
       logging.error(f"Error al procesar el AppImage: {e}")
 
   def process_and_add_appimage(self, file_path):
-    source_path = Path(file_path)
+    source_path = Path(file_path).resolve()
+    target_dir = self.managed_appimages_dir.resolve()
 
-    if not source_path.is_relative_to(self.managed_appimages_dir):
-      target_path = self.managed_appimages_dir / source_path.name
-      try:
+    try:
+      if not source_path.is_relative_to(target_dir):
+        target_path = target_dir / source_path.name
         shutil.move(str(source_path), str(target_path))
         file_path = str(target_path)
         logging.debug(f"AppImage movida a carpeta segura -> {file_path}")
-      except Exception as e:
-        logging.error(f"Error al mover el AppImage a la carpeta segura: {e}")
-        file_path = str(source_path)
+      else:
+        logging.debug(
+            f"El AppImage ya se encontraba en la carpeta segura ->"
+            f" {source_path}"
+        )
+    except Exception as e:
+      logging.error(f"Error al mover el AppImage a la carpeta segura: {e}")
+      file_path = str(source_path)
 
     self.add_appimage_to_ui(file_path, save=True)
 
