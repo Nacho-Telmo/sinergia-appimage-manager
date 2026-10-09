@@ -10,7 +10,7 @@ Un gestor moderno y oscuro de AppImages para Linux con integración nativa.
 
 * **Integración con el Sistema:** Gestión automática de accesos directos (`.desktop`) e iconos escalables en el directorio del sistema.
 
-* **Ligero y Eficiente:** Pensado para un rendimiento óptimo en Arch Linux.
+* **Ligero y Eficiente:** Pensado para un rendimiento óptimo.
 
 ## Instalación
 
@@ -23,12 +23,17 @@ yay -S sinergia-appimage-manager
 
 ```
 
-## Uso
-
-Una vez instalado, puedes iniciar **Sinergia** directamente desde el lanzador de aplicaciones de tu escritorio o ejecutando en la terminal 
+```
+paru -S sinergia-appimage-manager
 
 ```
-sinergia-appimage-manager
+
+## Uso
+
+Una vez instalado, puedes iniciar directamente desde el lanzador de aplicaciones de tu escritorio o ejecutando en la terminal 
+
+```
+appimage-manager
 ```
 
  
