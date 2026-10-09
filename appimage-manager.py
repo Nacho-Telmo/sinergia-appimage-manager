@@ -134,9 +134,8 @@ class AppImageManager(QMainWindow):
     self.desktop_apps_dir = Path.home() / ".local" / "share" / "applications"
     self.desktop_apps_dir.mkdir(parents=True, exist_ok=True)
 
-    self.managed_appimages_dir = (
-        Path.home() / ".local" / "share" / "sinergia" / "appimages"
-    )
+    # NUEVA UBICACIÓN SEGURA SOLICITADA
+    self.managed_appimages_dir = Path.home() / "appimage"
     self.managed_appimages_dir.mkdir(parents=True, exist_ok=True)
 
     self.setStyleSheet("""
